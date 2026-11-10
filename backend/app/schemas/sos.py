@@ -1,9 +1,9 @@
 """Pydantic schemas for Emergency SOS Assistance."""
 
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class GeoLocation(BaseModel):
@@ -13,12 +13,33 @@ class GeoLocation(BaseModel):
 
 
 class SOSTriggerRequest(BaseModel):
-    latitude: float = Field(ge=-90.0, le=90.0)
-    longitude: float = Field(ge=-180.0, le=180.0)
+    latitude: float = Field(default=12.9716, ge=-90.0, le=90.0)
+    longitude: float = Field(default=77.5946, ge=-180.0, le=180.0)
     accuracy: float | None = Field(None, ge=0.0)
     message: str | None = Field(
-        "I need help. Please contact me as soon as possible.", max_length=500
+        default="I need urgent assistance. Please contact me immediately. My location has been sent.",
+        max_length=500,
     )
+    recipient_email: str | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_input(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            # If coordinates object is supplied by frontend
+            coords = data.get("coordinates")
+            if isinstance(coords, dict):
+                if "latitude" in coords and coords["latitude"] is not None:
+                    data["latitude"] = coords["latitude"]
+                if "longitude" in coords and coords["longitude"] is not None:
+                    data["longitude"] = coords["longitude"]
+                if "accuracy" in coords and coords["accuracy"] is not None:
+                    data["accuracy"] = coords["accuracy"]
+
+            # If notes is provided instead of message
+            if not data.get("message") and data.get("notes"):
+                data["message"] = data["notes"]
+        return data
 
 
 class ContactAlertSnapshot(BaseModel):

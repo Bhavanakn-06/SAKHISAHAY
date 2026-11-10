@@ -64,6 +64,7 @@ class Settings(BaseSettings):
     EMAIL_USER: str = ""
     EMAIL_PASSWORD: str = ""
     ADMIN_EMAIL: str = ""
+    SOS_ALERT_EMAIL: str = "damruthakalyani@gmail.com"
     ENABLE_REAL_NOTIFICATIONS: bool = True
     FRONTEND_BASE_URL: str = "http://localhost:5173"
     TWILIO_ACCOUNT_SID: str = ""
@@ -94,6 +95,11 @@ class Settings(BaseSettings):
         return [
             t.strip().lower() for t in self.ALLOWED_UPLOAD_TYPES.split(",") if t.strip()
         ]
+
+    @property
+    def sos_alert_recipients(self) -> list[str]:
+        raw = self.SOS_ALERT_EMAIL or ""
+        return [email.strip() for email in raw.split(",") if email.strip() and "@" in email]
 
     @model_validator(mode="after")
     def validate_production_guards(self) -> "Settings":

@@ -102,6 +102,7 @@ function SOS() {
   const [isTriggering, setIsTriggering] = useState(false);
   const [isResolving, setIsResolving] = useState(false);
   const [serverError, setServerError] = useState("");
+  const [customAlertEmail, setCustomAlertEmail] = useState("damruthakalyani@gmail.com");
 
   const [locationStatus, setLocationStatus] = useState("idle"); // idle | loading | success | error
   const [coordinates, setCoordinates] = useState(null);
@@ -191,6 +192,7 @@ function SOS() {
         : null,
       address: null,
       notes: "Emergency SOS triggered by user from web app.",
+      recipient_email: customAlertEmail.trim() || undefined,
     };
 
     try {
@@ -519,10 +521,33 @@ function SOS() {
             <h2 id="confirm-title" style={{ color: "#B71C1C", marginBottom: "0.75rem", fontSize: "1.4rem" }}>
               Confirm Emergency SOS Trigger
             </h2>
-            <p style={{ color: "#555", fontSize: "0.95rem", lineHeight: 1.5, marginBottom: "1.5rem" }}>
+            <p style={{ color: "#555", fontSize: "0.95rem", lineHeight: 1.5, marginBottom: "1rem" }}>
               Are you sure you want to trigger an Emergency SOS alert? This will immediately alert your{" "}
               <strong>{contacts.length}</strong> emergency contact(s) with your GPS coordinates.
             </p>
+            <div style={{ textAlign: "left", marginBottom: "1.25rem", backgroundColor: "#FFF3E0", padding: "0.75rem", borderRadius: "8px", border: "1px solid #FFE0B2" }}>
+              <label htmlFor="sos-email-input" style={{ fontSize: "0.82rem", fontWeight: 700, color: "#E65100", display: "block", marginBottom: "0.3rem" }}>
+                📧 Send Emergency Alert Email To:
+              </label>
+              <input
+                id="sos-email-input"
+                type="email"
+                value={customAlertEmail}
+                onChange={(e) => setCustomAlertEmail(e.target.value)}
+                placeholder="Enter destination email (e.g. family@gmail.com)"
+                style={{
+                  width: "100%",
+                  padding: "0.55rem 0.75rem",
+                  borderRadius: "6px",
+                  border: "1px solid #FFB74D",
+                  fontSize: "0.9rem",
+                  boxSizing: "border-box",
+                }}
+              />
+              <span style={{ fontSize: "0.72rem", color: "#666", display: "block", marginTop: "0.25rem" }}>
+                Your GPS coordinates and Google Maps link will be sent to this email address.
+              </span>
+            </div>
             <div style={{ display: "flex", gap: "1rem", justifyContent: "center" }}>
               <button
                 type="button"

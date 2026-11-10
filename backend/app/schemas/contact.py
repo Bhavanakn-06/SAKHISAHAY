@@ -15,6 +15,7 @@ class ContactBase(BaseModel):
     )
     phone: str = Field(default="", description="10-digit Indian mobile number")
     phone_number: str | None = None
+    email: str | None = None
     relationship: RelationshipType = Field(description="Relationship to contact")
 
     @field_validator("phone", mode="before")
@@ -38,6 +39,7 @@ class ContactCreate(ContactBase):
 class ContactUpdate(BaseModel):
     name: str | None = Field(None, min_length=2, max_length=100)
     phone: str | None = None
+    email: str | None = None
     relationship: RelationshipType | None = None
 
     @field_validator("phone")

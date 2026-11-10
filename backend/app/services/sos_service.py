@@ -68,17 +68,40 @@ class SOSService:
                 f"[DISPATCH SMS] To: {c['phone']} ({c['name']}) -> SAKHISAHAY EMERGENCY ALERT! Location: {data.latitude},{data.longitude}. Msg: {data.message}"
             )
 
-        # Dispatch emergency email alert to administrator
+        # Collect all destination email addresses for this emergency
+        recipients_to_notify: set[str] = set()
+
+        # 1. Custom recipient email passed in request
+        if getattr(data, "recipient_email", None) and "@" in data.recipient_email:
+            recipients_to_notify.add(data.recipient_email.strip())
+
+        # 2. Configured SOS alert emails
+        from backend.app.core.config import settings
+
+        for em in settings.sos_alert_recipients:
+            recipients_to_notify.add(em)
+
+        # 3. Admin email
+        admin_target = settings.ADMIN_EMAIL or settings.FIRST_ADMIN_EMAIL
+        if admin_target:
+            recipients_to_notify.add(admin_target.strip())
+
+        # 4. Emergency contacts with an email
+        for c in contacts:
+            c_email = c.get("email")
+            if c_email and "@" in c_email:
+                recipients_to_notify.add(c_email.strip())
+
+        # Dispatch emergency email alert to all recipient emails
         try:
-            from backend.app.core.config import settings
             from backend.app.services.notification_service import NotificationService
+
             notifier = NotificationService()
-            admin_target = settings.ADMIN_EMAIL or settings.FIRST_ADMIN_EMAIL
-            if admin_target:
+            for target_email in recipients_to_notify:
                 await notifier.send_sos_alert_email(
-                    to_email=admin_target,
-                    user_name=f"User {user_id}",
-                    user_email=admin_target,
+                    to_email=target_email,
+                    user_name=f"SAKHISAHAY User ({user_id})",
+                    user_email=admin_target or target_email,
                     latitude=data.latitude,
                     longitude=data.longitude,
                     message=data.message,
