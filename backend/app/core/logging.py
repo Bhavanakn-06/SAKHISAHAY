@@ -51,11 +51,11 @@ def setup_logging(log_level: str = "INFO") -> logging.Logger:
     handler.setFormatter(JSONFormatter())
     root_logger.addHandler(handler)
 
-    # Silence overly verbose external loggers
-    logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
-    logging.getLogger("motor").setLevel(logging.WARNING)
+    # Suppress verbose noisy third-party loggers
+    logging.getLogger("uvicorn.access").handlers = []
+    logging.getLogger("uvicorn.access").propagate = False
 
-    return root_logger
+    return logging.getLogger("sakhisahay")
 
 
-logger = logging.getLogger("sakhisahay")
+logger = setup_logging()
