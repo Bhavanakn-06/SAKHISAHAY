@@ -55,10 +55,20 @@ class Settings(BaseSettings):
     # Email
     SMTP_HOST: str = "smtp.gmail.com"
     SMTP_PORT: int = 587
-    SMTP_USER: str = "support@sakhisahay.example"
-    SMTP_PASSWORD: str = "placeholder-password"
-    EMAIL_FROM: str = "no-reply@sakhisahay.example"
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    EMAIL_FROM: str = ""
     SMTP_TLS: bool = True
+
+    # Email aliases & notification controls
+    EMAIL_USER: str = ""
+    EMAIL_PASSWORD: str = ""
+    ADMIN_EMAIL: str = ""
+    ENABLE_REAL_NOTIFICATIONS: bool = True
+    FRONTEND_BASE_URL: str = "http://localhost:5173"
+    TWILIO_ACCOUNT_SID: str = ""
+    TWILIO_AUTH_TOKEN: str = ""
+    TWILIO_FROM_NUMBER: str = ""
 
     # Seed Admin
     FIRST_ADMIN_EMAIL: str = "admin@sakhisahay.example"
@@ -87,6 +97,25 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_production_guards(self) -> "Settings":
+        # Synchronize email aliases
+        if self.EMAIL_USER and not self.SMTP_USER:
+            self.SMTP_USER = self.EMAIL_USER
+        elif self.SMTP_USER and not self.EMAIL_USER:
+            self.EMAIL_USER = self.SMTP_USER
+
+        if self.EMAIL_PASSWORD and not self.SMTP_PASSWORD:
+            self.SMTP_PASSWORD = self.EMAIL_PASSWORD
+        elif self.SMTP_PASSWORD and not self.EMAIL_PASSWORD:
+            self.EMAIL_PASSWORD = self.SMTP_PASSWORD
+
+        if not self.EMAIL_FROM:
+            self.EMAIL_FROM = self.SMTP_USER or self.EMAIL_USER or "no-reply@sakhisahay.org"
+
+        if self.ADMIN_EMAIL:
+            self.FIRST_ADMIN_EMAIL = self.ADMIN_EMAIL
+        elif self.FIRST_ADMIN_EMAIL:
+            self.ADMIN_EMAIL = self.FIRST_ADMIN_EMAIL
+
         """Strict production guards: reject unsafe defaults when APP_ENV is production."""
         if self.APP_ENV == "production":
             if "dev-insecure" in self.SECRET_KEY or len(self.SECRET_KEY) < 32:

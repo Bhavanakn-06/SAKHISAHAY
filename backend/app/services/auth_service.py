@@ -269,6 +269,16 @@ class AuthService:
         logger.info(
             f"[DEV CONSOLE EMAIL] Password reset token for {normalized}: {raw_reset_token}"
         )
+
+        # Dispatch password reset email
+        reset_url = f"{settings.FRONTEND_BASE_URL}/reset-password?token={raw_reset_token}"
+        try:
+            from backend.app.services.notification_service import NotificationService
+            notifier = NotificationService()
+            await notifier.send_password_reset_email(normalized, reset_url)
+        except Exception as e:
+            logger.warning(f"Failed to dispatch password reset email to {normalized}: {e}")
+
         await self.audit_repo.log_action(
             action="AUTH_FORGOT_PASSWORD_REQUEST",
             resource="users",

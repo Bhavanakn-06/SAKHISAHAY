@@ -68,6 +68,24 @@ class SOSService:
                 f"[DISPATCH SMS] To: {c['phone']} ({c['name']}) -> SAKHISAHAY EMERGENCY ALERT! Location: {data.latitude},{data.longitude}. Msg: {data.message}"
             )
 
+        # Dispatch emergency email alert to administrator
+        try:
+            from backend.app.core.config import settings
+            from backend.app.services.notification_service import NotificationService
+            notifier = NotificationService()
+            admin_target = settings.ADMIN_EMAIL or settings.FIRST_ADMIN_EMAIL
+            if admin_target:
+                await notifier.send_sos_alert_email(
+                    to_email=admin_target,
+                    user_name=f"User {user_id}",
+                    user_email=admin_target,
+                    latitude=data.latitude,
+                    longitude=data.longitude,
+                    message=data.message,
+                )
+        except Exception as email_err:
+            logger.warning(f"Failed to dispatch SOS alert email: {email_err}")
+
         await self.audit_repo.log_action(
             action="SOS_TRIGGERED",
             resource="sos_alerts",

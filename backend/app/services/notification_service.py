@@ -1,6 +1,7 @@
 """Notification dispatch helpers for SMS and email providers."""
 
 import smtplib
+from datetime import UTC, datetime
 from email.message import EmailMessage
 from typing import Any
 
@@ -10,7 +11,7 @@ from backend.app.core.logging import logger
 
 
 class NotificationService:
-    """Dispatch notifications through configured providers with safe dev fallback."""
+    """Dispatch notifications through configured providers with safe fallback."""
 
     @property
     def sms_enabled(self) -> bool:
@@ -23,13 +24,58 @@ class NotificationService:
 
     @property
     def email_enabled(self) -> bool:
+        user = settings.SMTP_USER or settings.EMAIL_USER
+        password = settings.SMTP_PASSWORD or settings.EMAIL_PASSWORD
         return bool(
             settings.ENABLE_REAL_NOTIFICATIONS
             and settings.SMTP_HOST
-            and settings.SMTP_USER
-            and settings.SMTP_PASSWORD
-            and "placeholder" not in settings.SMTP_PASSWORD.lower()
+            and user
+            and password
+            and "placeholder" not in password.lower()
         )
+
+    async def send_email(self, to_email: str, subject: str, content: str) -> str:
+        """Send an email using SMTP with fallback to logging."""
+        if not self.email_enabled:
+            logger.info("[EMAIL LOGGED (disabled)] To: %s | Subject: %s", to_email, subject)
+            return "LOGGED"
+
+        user = settings.SMTP_USER or settings.EMAIL_USER
+        password = settings.SMTP_PASSWORD or settings.EMAIL_PASSWORD
+        from_email = settings.EMAIL_FROM or user
+
+        message = EmailMessage()
+        message["Subject"] = subject
+        message["From"] = from_email
+        message["To"] = to_email
+        message.set_content(content)
+
+        # 1. Try STARTTLS on SMTP_PORT (587)
+        try:
+            with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=10) as smtp:
+                if settings.SMTP_TLS:
+                    smtp.starttls()
+                smtp.login(user, password)
+                smtp.send_message(message)
+            logger.info("Email sent successfully to %s: %s", to_email, subject)
+            return "SENT"
+        except Exception as exc:
+            # 2. Try SSL fallback on port 465 if port 587 was closed by network/ISP
+            try:
+                with smtplib.SMTP_SSL(settings.SMTP_HOST, 465, timeout=10) as smtp_ssl:
+                    smtp_ssl.login(user, password)
+                    smtp_ssl.send_message(message)
+                logger.info("Email sent successfully via SSL to %s: %s", to_email, subject)
+                return "SENT"
+            except Exception as ssl_exc:
+                logger.warning(
+                    "SMTP dispatch to %s failed (STARTTLS: %s, SSL: %s). Fallback to logging.",
+                    to_email,
+                    exc,
+                    ssl_exc,
+                )
+                logger.info("[EMAIL LOGGED (fallback)] To: %s | %s\n%s", to_email, subject, content)
+                return "LOGGED"
 
     async def send_sms(self, to_phone: str, body: str) -> str:
         """Send one SMS. Returns SENT when real dispatch succeeds, otherwise LOGGED."""
@@ -93,28 +139,41 @@ class NotificationService:
             )
         return snapshots
 
-    async def send_password_reset_email(self, email: str, reset_url: str) -> str:
-        """Send password reset email or log it in development."""
-        subject = "Reset your SAKHISAHAY password"
-        body = (
-            "We received a request to reset your SAKHISAHAY password.\n\n"
-            f"Open this link within 15 minutes:\n{reset_url}\n\n"
-            "If you did not request this, you can ignore this email."
+    async def send_sos_alert_email(
+        self,
+        to_email: str,
+        user_name: str,
+        user_email: str,
+        latitude: float,
+        longitude: float,
+        message: str | None = None,
+    ) -> str:
+        """Send SOS emergency alert email to admin or emergency contact."""
+        map_link = f"https://maps.google.com/?q={latitude},{longitude}"
+        subject = f"🚨 EMERGENCY ALERT: SAKHISAHAY SOS triggered by {user_name}"
+        content = (
+            f"🚨 SAKHISAHAY EMERGENCY SOS ALERT!\n\n"
+            f"A user has triggered an emergency SOS signal:\n"
+            f"• User Name: {user_name}\n"
+            f"• User Email: {user_email}\n"
+            f"• Latitude: {latitude:.6f}\n"
+            f"• Longitude: {longitude:.6f}\n"
+            f"• Google Maps Location: {map_link}\n"
+            f"• Message: {message or 'Immediate assistance required.'}\n"
+            f"• Triggered At: {datetime.now(UTC).strftime('%Y-%m-%d %H:%M:%S UTC')}\n\n"
+            f"If you are an emergency contact or administrator, please verify their safety immediately or dial 112."
         )
+        return await self.send_email(to_email, subject, content)
 
-        if not self.email_enabled:
-            logger.info("[EMAIL LOGGED] To: %s | %s | %s", email, subject, reset_url)
-            return "LOGGED"
-
-        message = EmailMessage()
-        message["Subject"] = subject
-        message["From"] = settings.EMAIL_FROM
-        message["To"] = email
-        message.set_content(body)
-
-        with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=10) as smtp:
-            if settings.SMTP_TLS:
-                smtp.starttls()
-            smtp.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
-            smtp.send_message(message)
-        return "SENT"
+    async def send_password_reset_email(self, email: str, reset_url: str) -> str:
+        """Send password reset email with secure token link."""
+        subject = "Reset your SAKHISAHAY password"
+        content = (
+            f"Hello,\n\n"
+            f"We received a request to reset your SAKHISAHAY account password.\n\n"
+            f"Please open this secure link within 15 minutes to reset your password:\n"
+            f"{reset_url}\n\n"
+            f"If you did not request a password reset, you can safely ignore this email.\n\n"
+            f"— SAKHISAHAY Team"
+        )
+        return await self.send_email(email, subject, content)
