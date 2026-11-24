@@ -98,17 +98,7 @@ def create_application() -> FastAPI:
     # 1. GZip Compression
     app.add_middleware(GZipMiddleware, minimum_size=1000)
 
-    # 2. CORS Headers
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=settings.cors_origins_list,
-        allow_credentials=True,
-        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
-        allow_headers=["*"],
-        expose_headers=["X-Request-ID"],
-    )
-
-    # 3. Custom Request Tracking & Security Headers Middleware
+    # 2. Custom Request Tracking & Security Headers Middleware
     @app.middleware("http")
     async def request_context_middleware(request: Request, call_next) -> Response:
         # Request Correlation ID
@@ -147,8 +137,41 @@ def create_application() -> FastAPI:
         )
         return response
 
+    # 3. CORS Headers (Added outermost so all preflights and errors retain CORS headers)
+    cors_origins = [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:5174",
+        "http://127.0.0.1:5174",
+        "http://localhost:5175",
+        "http://127.0.0.1:5175",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+    ]
+    for origin in settings.cors_origins_list:
+        if origin not in cors_origins:
+            cors_origins.append(origin)
+
+    cors_kwargs = {
+        "allow_origins": cors_origins,
+        "allow_credentials": True,
+        "allow_methods": ["*"],
+        "allow_headers": ["*"],
+        "expose_headers": ["X-Request-ID", "Content-Disposition"],
+    }
+    if settings.APP_ENV != "production":
+        cors_kwargs["allow_origin_regex"] = (
+            r"^https?://(localhost|127\.0\.0\.1|0\.0\.0\.0|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+)(:\d+)?$"
+        )
+
+    app.add_middleware(CORSMiddleware, **cors_kwargs)
+
     # Mount API v1 Router
     app.include_router(api_v1_router, prefix=settings.API_V1_PREFIX)
+    if settings.API_V1_PREFIX != "/api":
+        app.include_router(api_v1_router, prefix="/api", include_in_schema=False)
 
     # Top-level root info endpoint
     @app.get("/", tags=["Root"])

@@ -57,6 +57,12 @@ def clear_refresh_cookie(response: Response) -> None:
     status_code=status.HTTP_201_CREATED,
     summary="Register a new user account",
 )
+@router.post(
+    "/signup/",
+    response_model=TokenResponse,
+    status_code=status.HTTP_201_CREATED,
+    include_in_schema=False,
+)
 @limiter.limit(settings.RATE_LIMIT_AUTH)
 async def signup(
     request: Request,
@@ -84,6 +90,12 @@ async def signup(
     status_code=status.HTTP_200_OK,
     summary="Log in with email and password",
 )
+@router.post(
+    "/login/",
+    response_model=TokenResponse,
+    status_code=status.HTTP_200_OK,
+    include_in_schema=False,
+)
 @limiter.limit(settings.RATE_LIMIT_AUTH)
 async def login(
     request: Request,
@@ -110,6 +122,12 @@ async def login(
     response_model=TokenResponse,
     status_code=status.HTTP_200_OK,
     summary="Refresh short-lived access token",
+)
+@router.post(
+    "/refresh/",
+    response_model=TokenResponse,
+    status_code=status.HTTP_200_OK,
+    include_in_schema=False,
 )
 async def refresh_token(
     request: Request,
@@ -162,6 +180,12 @@ async def logout(
     response_model=UserProfileResponse,
     status_code=status.HTTP_200_OK,
     summary="Get current user profile and overview",
+)
+@router.get(
+    "/me/",
+    response_model=UserProfileResponse,
+    status_code=status.HTTP_200_OK,
+    include_in_schema=False,
 )
 async def get_me(
     current_user: dict[str, Any] = Depends(get_current_user),

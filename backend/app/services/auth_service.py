@@ -3,6 +3,7 @@
 from datetime import UTC, datetime
 from typing import Any
 
+from backend.app.core.config import settings
 from backend.app.core.exceptions import (
     ConflictException,
     ForbiddenException,
@@ -94,6 +95,7 @@ class AuthService:
     async def login(
         self, data: UserLogin, ip: str | None = None, user_agent: str | None = None
     ) -> tuple[dict[str, Any], str, str]:
+        now = datetime.now(UTC)
         normalized_email = data.email.strip().lower()
         user = await self.user_repo.get_by_email(normalized_email)
 
@@ -110,7 +112,6 @@ class AuthService:
 
         # Check account lockout
         locked_until = user.get("locked_until")
-        now = datetime.now(UTC)
         if locked_until:
             if locked_until.tzinfo is None:
                 locked_until = locked_until.replace(tzinfo=UTC)
